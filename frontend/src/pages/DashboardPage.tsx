@@ -19,6 +19,7 @@ const DashboardPage = () => {
         <span style={styles.navTitle}>Будучыня.BY</span>
         <div style={styles.navLinks}>
           <Link to="/grades" style={styles.navLink}>Мои оценки</Link>
+          <Link to="/chatbot" style={styles.navLink}>AI-Навигатор</Link>
           <button onClick={handleLogout} style={styles.logoutBtn}>Выйти</button>
         </div>
       </nav>
@@ -40,11 +41,11 @@ const DashboardPage = () => {
             <p style={styles.cardDesc}>Введи свои оценки по предметам</p>
           </Link>
 
-          <div style={{ ...styles.card, opacity: 0.6, cursor: 'not-allowed' }}>
+          <Link to="/chatbot" style={styles.card}>
             <div style={styles.cardIcon}>🤖</div>
             <h3 style={styles.cardTitle}>AI-Навигатор</h3>
-            <p style={styles.cardDesc}>Скоро: чатбот для выбора профессии</p>
-          </div>
+            <p style={styles.cardDesc}>Задай вопрос про вузы и профессии РБ</p>
+          </Link>
 
           <div style={{ ...styles.card, opacity: 0.6, cursor: 'not-allowed' }}>
             <div style={styles.cardIcon}>🗺️</div>
@@ -58,10 +59,7 @@ const DashboardPage = () => {
 };
 
 const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: '100vh',
-    background: '#f5f7fa',
-  },
+  page: { minHeight: '100vh', background: '#f5f7fa' },
   nav: {
     background: '#0f3460',
     padding: '0 32px',
@@ -70,21 +68,9 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  navTitle: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: '18px',
-  },
-  navLinks: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '20px',
-  },
-  navLink: {
-    color: '#fff',
-    textDecoration: 'none',
-    fontSize: '14px',
-  },
+  navTitle: { color: '#fff', fontWeight: '700', fontSize: '18px' },
+  navLinks: { display: 'flex', alignItems: 'center', gap: '20px' },
+  navLink: { color: '#fff', textDecoration: 'none', fontSize: '14px' },
   logoutBtn: {
     background: 'rgba(255,255,255,0.15)',
     color: '#fff',
@@ -94,25 +80,10 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontSize: '14px',
   },
-  main: {
-    maxWidth: '900px',
-    margin: '0 auto',
-    padding: '40px 20px',
-  },
-  welcome: {
-    marginBottom: '32px',
-  },
-  greeting: {
-    fontSize: '32px',
-    fontWeight: '700',
-    color: '#1a1a2e',
-    margin: '0 0 8px',
-  },
-  gradeInfo: {
-    color: '#666',
-    fontSize: '16px',
-    margin: 0,
-  },
+  main: { maxWidth: '900px', margin: '0 auto', padding: '40px 20px' },
+  welcome: { marginBottom: '32px' },
+  greeting: { fontSize: '32px', fontWeight: '700', color: '#1a1a2e', margin: '0 0 8px' },
+  gradeInfo: { color: '#666', fontSize: '16px', margin: 0 },
   cards: {
     display: 'grid',
     gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
@@ -125,24 +96,11 @@ const styles: Record<string, React.CSSProperties> = {
     textDecoration: 'none',
     boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
     display: 'block',
-    transition: 'transform 0.2s',
     cursor: 'pointer',
   },
-  cardIcon: {
-    fontSize: '36px',
-    marginBottom: '12px',
-  },
-  cardTitle: {
-    fontSize: '18px',
-    fontWeight: '600',
-    color: '#1a1a2e',
-    margin: '0 0 8px',
-  },
-  cardDesc: {
-    fontSize: '14px',
-    color: '#666',
-    margin: 0,
-  },
+  cardIcon: { fontSize: '36px', marginBottom: '12px' },
+  cardTitle: { fontSize: '18px', fontWeight: '600', color: '#1a1a2e', margin: '0 0 8px' },
+  cardDesc: { fontSize: '14px', color: '#666', margin: 0 },
 };
 
 export default DashboardPage;

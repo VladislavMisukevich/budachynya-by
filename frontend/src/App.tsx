@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import GradesPage from './pages/GradesPage';
+import ChatbotPage from './pages/ChatbotPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -33,6 +34,9 @@ function App() {
         } />
         <Route path="/grades" element={
           <ProtectedRoute><GradesPage /></ProtectedRoute>
+        } />
+        <Route path="/chatbot" element={
+          <ProtectedRoute><ChatbotPage /></ProtectedRoute>
         } />
         <Route path="*" element={
           <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />
