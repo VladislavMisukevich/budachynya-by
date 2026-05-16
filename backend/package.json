@@ -16,7 +16,7 @@
   "license": "ISC",
   "dependencies": {
     "@pinecone-database/pinecone": "^3.0.3",
-    "@prisma/client": "^7.8.0",
+    "@prisma/client": "^6.8.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
@@ -35,7 +35,7 @@
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.7",
     "nodemon": "^3.1.9",
-    "prisma": "^6.2.1",
+    "prisma": "^6.8.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.7.3"
   }
