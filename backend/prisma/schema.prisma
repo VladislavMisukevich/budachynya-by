@@ -60,7 +60,6 @@ model Institution {
   city        String
   faculties   Json
   entryScores Json
-  pineconeIds Json?
   isActive    Boolean @default(true)
 
   @@map("institutions")
@@ -76,4 +75,14 @@ model ChatMessage {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("chat_messages")
+}
+
+model KnowledgeChunk {
+  id        String   @id @default(uuid())
+  content   String   @db.Text
+  source    String
+  category  String
+  createdAt DateTime @default(now())
+
+  @@map("knowledge_chunks")
 }
