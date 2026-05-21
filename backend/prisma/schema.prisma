@@ -8,19 +8,23 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  passwordHash  String
-  firstName     String
-  lastName      String
-  schoolGrade   Int
-  city          String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String   @id @default(uuid())
+  email           String   @unique
+  passwordHash    String
+  firstName       String
+  lastName        String
+  schoolGrade     Int
+  city            String?
+  hobbies         String?
+  achievements    String?
+  characteristic  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  grades        Grade[]
-  careerProfile CareerProfile?
-  chatHistory   ChatMessage[]
+  grades          Grade[]
+  examScores      ExamScore[]
+  careerProfile   CareerProfile?
+  chatHistory     ChatMessage[]
 
   @@map("users")
 }
@@ -29,23 +33,44 @@ model Grade {
   id        String   @id @default(uuid())
   userId    String
   subject   String
-  score     Int
-  quarter   Int?
+  quarter1  Float?
+  quarter2  Float?
+  quarter3  Float?
+  quarter4  Float?
+  yearScore Float?
+  examScore String?
+  finalScore Float?
   year      Int
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, subject, year])
   @@map("grades")
+}
+
+model ExamScore {
+  id        String   @id @default(uuid())
+  userId    String
+  examType  String
+  subject   String
+  score     Int
+  year      Int
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("exam_scores")
 }
 
 model CareerProfile {
   id                String   @id @default(uuid())
   userId            String   @unique
-  desiredSphere     String
+  desiredSphere     String?
   desiredUniversity String?
   cri               Float?
+  criBreakdown      Json?
   trackerPlan       Json?
   updatedAt         DateTime @updatedAt
 

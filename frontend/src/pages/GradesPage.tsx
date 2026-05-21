@@ -1,265 +1,386 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../store/store';
-import { fetchGradesThunk, createGradeThunk, deleteGradeThunk } from '../store/gradesSlice';
+import {
+  fetchGradesThunk, fetchExamsThunk,
+  upsertGradeThunk, deleteGradeThunk,
+  createExamThunk, deleteExamThunk,
+} from '../store/gradesSlice';
+import { gradesApi } from '../api/grades.api';
+import Layout from '../components/Layout';
+import '../styles/grades.css';
 
-const SUBJECTS = [
-  'Математика','Алгебра','Геометрия','Физика','Химия','Биология',
-  'История','География','Русский язык','Белорусский язык',
-  'Литература','Английский язык','Информатика','Обществоведение',
+const CURRENT_YEAR = new Date().getFullYear();
+const EXAM_SUBJECTS = [
+  'Математика','Физика','Химия','Биология','История Беларуси',
+  'Всемирная история','Обществоведение','Английский язык',
+  'Русский язык','Белорусский язык','Информатика','География',
 ];
 
-const SCORE_COLOR = (score: number) => {
-  if (score >= 9) return '#16a34a';
-  if (score >= 7) return '#2563eb';
-  if (score >= 5) return '#d97706';
-  return '#dc2626';
+type Tab = 'grades' | 'exams';
+
+interface PopupState {
+  subject: string;
+  field: string;
+  x: number;
+  y: number;
+  currentValue: number | string | null | undefined;
+}
+
+const SCORE_LABELS: Record<number, string> = {
+  10: '10 — высший', 9: '9 — отлично', 8: '8 — хорошо',
+  7: '7 — хорошо', 6: '6 — достаточно', 5: '5 — средне',
+  4: '4 — ниже среднего', 3: '3 — низкий', 2: '2 — низкий', 1: '1 — низший',
+};
+
+const scoreClass = (score: number | null | undefined): string => {
+  if (!score) return '';
+  if (score >= 9) return 'cell--high';
+  if (score >= 7) return 'cell--mid';
+  if (score >= 5) return 'cell--low';
+  return 'cell--fail';
+};
+
+const computeExpectedAvg = (grades: {
+  quarter1?: number | null;
+  quarter2?: number | null;
+  quarter3?: number | null;
+  quarter4?: number | null;
+  yearScore?: number | null;
+  finalScore?: number | null;
+}[]): string => {
+  const finals = grades
+    .map(g => g.finalScore || g.yearScore)
+    .filter((s): s is number => s !== null && s !== undefined && s > 0);
+  if (finals.length === 0) {
+    const quarters = grades.flatMap(g => [g.quarter1, g.quarter2, g.quarter3, g.quarter4]
+      .filter((s): s is number => s !== null && s !== undefined && s > 0));
+    if (quarters.length === 0) return '—';
+    const raw = quarters.reduce((a, b) => a + b, 0) / quarters.length;
+    return (Math.round(raw * 2) / 2).toFixed(1);
+  }
+  const raw = finals.reduce((a, b) => a + b, 0) / finals.length;
+  return (Math.round(raw * 2) / 2).toFixed(1);
 };
 
 const GradesPage = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { grades, grouped, isLoading } = useSelector((state: RootState) => state.grades);
-
-  const [form, setForm] = useState({
-    subject: 'Математика',
-    score: 7,
-    quarter: 1,
-    year: new Date().getFullYear(),
+  const { user } = useSelector((state: RootState) => state.auth);
+  const { grades, examScores, isLoading } = useSelector((state: RootState) => state.grades);
+  const [subjects, setSubjects] = useState<string[]>([]);
+  const [tab, setTab] = useState<Tab>('grades');
+  const [popup, setPopup] = useState<PopupState | null>(null);
+  const [popupValue, setPopupValue] = useState<string>('');
+  const [showExamForm, setShowExamForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [examForm, setExamForm] = useState({
+    examType: 'ЦЭ', subject: 'Математика', score: '', year: CURRENT_YEAR,
   });
-  const [showForm, setShowForm] = useState(false);
+  const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     dispatch(fetchGradesThunk());
+    dispatch(fetchExamsThunk());
+    gradesApi.getSubjects().then(({ subjects }) => setSubjects(subjects));
   }, [dispatch]);
 
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const result = await dispatch(createGradeThunk({
-      ...form,
-      score: Number(form.score),
-      quarter: Number(form.quarter),
-      year: Number(form.year),
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+        setPopup(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const getGrade = (subject: string) =>
+    grades.find(g => g.subject === subject && g.year === CURRENT_YEAR);
+
+  const openPopup = (e: React.MouseEvent, subject: string, field: string) => {
+    e.stopPropagation();
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    const grade = getGrade(subject);
+    const val = grade ? (grade as unknown as Record<string, any>)[field] : undefined;
+    setPopup({
+      subject, field,
+      x: rect.left + window.scrollX,
+      y: rect.bottom + window.scrollY + 4,
+      currentValue: val as number | string | null | undefined,
+    });
+    setPopupValue(val !== null && val !== undefined ? String(val) : '');
+  };
+
+  const savePopup = async (value: string | number | null) => {
+    if (!popup) return;
+    setSaving(true);
+    const { subject, field } = popup;
+    const grade = getGrade(subject);
+    const isExamScore = field === 'examScore';
+    const numVal = !isExamScore && value !== '' && value !== null
+      ? Number(value) : undefined;
+
+    await dispatch(upsertGradeThunk({
+      subject, year: CURRENT_YEAR,
+      quarter1: grade?.quarter1 ?? undefined,
+      quarter2: grade?.quarter2 ?? undefined,
+      quarter3: grade?.quarter3 ?? undefined,
+      quarter4: grade?.quarter4 ?? undefined,
+      yearScore: grade?.yearScore ?? undefined,
+      examScore: grade?.examScore ?? undefined,
+      finalScore: grade?.finalScore ?? undefined,
+      [field]: isExamScore ? (String(value) || undefined) : numVal,
     }));
-    if (createGradeThunk.fulfilled.match(result)) {
-      setShowForm(false);
-      dispatch(fetchGradesThunk());
+    await dispatch(fetchGradesThunk());
+    setSaving(false);
+    setPopup(null);
+  };
+
+  const handleDeleteRow = async (subject: string) => {
+    const grade = getGrade(subject);
+    if (!grade) return;
+    if (window.confirm(`Удалить все оценки по "${subject}"?`)) {
+      await dispatch(deleteGradeThunk(grade.id));
     }
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('Удалить оценку?')) {
-      dispatch(deleteGradeThunk(id));
-      dispatch(fetchGradesThunk());
-    }
+  const handleAddExam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!examForm.score) return;
+    await dispatch(createExamThunk({
+      examType: examForm.examType, subject: examForm.subject,
+      score: Number(examForm.score), year: Number(examForm.year),
+    }));
+    setShowExamForm(false);
+    setExamForm({ examType: 'ЦЭ', subject: 'Математика', score: '', year: CURRENT_YEAR });
   };
+
+  const avg = computeExpectedAvg(grades);
+  const filledCount = subjects.filter(s => getGrade(s)).length;
 
   return (
-    <div style={styles.page}>
-      <nav style={styles.nav}>
-        <Link to="/dashboard" style={styles.navBack}>← Назад</Link>
-        <span style={styles.navTitle}>Будучыня.BY</span>
-        <button onClick={() => setShowForm(!showForm)} style={styles.addBtn}>
-          {showForm ? 'Отмена' : '+ Добавить оценку'}
-        </button>
-      </nav>
+    <Layout>
+      <div className="grades-page">
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Успеваемость</h1>
+            <p className="page-sub">
+              {user?.schoolGrade} класс · {CURRENT_YEAR} уч. год
+              · средний балл: <strong>{avg}</strong>
+              · внесено предметов: {filledCount} / {subjects.length}
+            </p>
+          </div>
+        </div>
 
-      <main style={styles.main}>
-        <h1 style={styles.title}>Мои оценки</h1>
+        <div className="tabs">
+          <button className={`tab ${tab === 'grades' ? 'tab--active' : ''}`} onClick={() => setTab('grades')}>
+            Журнал оценок
+          </button>
+          <button className={`tab ${tab === 'exams' ? 'tab--active' : ''}`} onClick={() => setTab('exams')}>
+            ЦЭ / ЦТ / РТ
+          </button>
+        </div>
 
-        {showForm && (
-          <div style={styles.formCard}>
-            <h3 style={styles.formTitle}>Новая оценка</h3>
-            <form onSubmit={handleAdd} style={styles.form}>
-              <select
-                style={styles.input}
-                value={form.subject}
-                onChange={(e) => setForm((p) => ({ ...p, subject: e.target.value }))}
-              >
-                {SUBJECTS.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
+        {tab === 'grades' && (
+          <div className="journal-wrap">
+            <p className="journal-hint">
+              Нажми на ячейку — появится панель выбора оценки. Экзаменационное изложение вводится через дробь (8/7).
+              Средний балл считается по внесённым итоговым оценкам с округлением 0.5 в пользу ученика.
+            </p>
+            <div className="journal-scroll">
+              <table className="journal-table">
+                <thead>
+                  <tr>
+                    <th className="th-num">№</th>
+                    <th className="th-subject">Предмет</th>
+                    <th className="th-q">I</th>
+                    <th className="th-q">II</th>
+                    <th className="th-q">III</th>
+                    <th className="th-q">IV</th>
+                    <th className="th-q">Год</th>
+                    <th className="th-exam">Экз.</th>
+                    <th className="th-final">Итог</th>
+                    <th className="th-del"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {subjects.map((subject, idx) => {
+                    const grade = getGrade(subject);
+                    const renderCell = (field: string, value: number | string | null | undefined) => {
+                      const isExam = field === 'examScore';
+                      const numVal = typeof value === 'number' ? value : null;
+                      return (
+                        <td
+                          key={field}
+                          className={`td-cell ${numVal ? scoreClass(numVal) : 'td-empty'} ${popup?.subject === subject && popup?.field === field ? 'td-active' : ''}`}
+                          onClick={(e) => openPopup(e, subject, field)}
+                        >
+                          {isExam ? (value || '') : (value ?? '')}
+                        </td>
+                      );
+                    };
 
-              <select
-                style={styles.input}
-                value={form.score}
-                onChange={(e) => setForm((p) => ({ ...p, score: Number(e.target.value) }))}
-              >
-                {[1,2,3,4,5,6,7,8,9,10].map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
+                    return (
+                      <tr key={subject} className={grade ? 'tr-has-data' : ''}>
+                        <td className="td-num">{idx + 1}</td>
+                        <td className="td-subject">{subject}</td>
+                        {renderCell('quarter1', grade?.quarter1)}
+                        {renderCell('quarter2', grade?.quarter2)}
+                        {renderCell('quarter3', grade?.quarter3)}
+                        {renderCell('quarter4', grade?.quarter4)}
+                        {renderCell('yearScore', grade?.yearScore)}
+                        {renderCell('examScore', grade?.examScore)}
+                        {renderCell('finalScore', grade?.finalScore)}
+                        <td className="td-del">
+                          {grade && (
+                            <button className="del-btn" onClick={() => handleDeleteRow(subject)} title="Удалить строку">×</button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {isLoading && <p className="loading-hint">Загрузка...</p>}
+          </div>
+        )}
 
-              <select
-                style={styles.input}
-                value={form.quarter}
-                onChange={(e) => setForm((p) => ({ ...p, quarter: Number(e.target.value) }))}
-              >
-                {[1,2,3,4].map((q) => <option key={q} value={q}>{q} четверть</option>)}
-              </select>
-
-              <button type="submit" style={styles.submitBtn} disabled={isLoading}>
-                Сохранить
+        {tab === 'exams' && (
+          <div className="exams-section">
+            <div className="exams-header">
+              <p className="journal-hint">
+                ЦЭ, ЦТ и РТ учитываются при расчёте CRI и рекомендациях AI-навигатора.
+                РТ (республиканское тестирование) проводится в марте-апреле — полезно для практики.
+              </p>
+              <button className="btn-add" onClick={() => setShowExamForm(!showExamForm)}>
+                {showExamForm ? 'Отмена' : '+ Добавить результат'}
               </button>
-            </form>
-          </div>
-        )}
-
-        {isLoading && <p style={styles.loading}>Загружаем оценки...</p>}
-
-        {!isLoading && grades.length === 0 && (
-          <div style={styles.empty}>
-            <p>У тебя пока нет оценок.</p>
-            <p>Нажми "+ Добавить оценку" чтобы начать!</p>
-          </div>
-        )}
-
-        {grouped.map((group) => (
-          <div key={group.subject} style={styles.groupCard}>
-            <div style={styles.groupHeader}>
-              <h3 style={styles.groupSubject}>{group.subject}</h3>
-              <span style={{
-                ...styles.avgBadge,
-                background: SCORE_COLOR(group.average),
-              }}>
-                Средний: {group.average}
-              </span>
             </div>
-            <div style={styles.gradesList}>
-              {group.grades.map((grade) => (
-                <div key={grade.id} style={styles.gradeRow}>
-                  <span style={{
-                    ...styles.scoreBadge,
-                    background: SCORE_COLOR(grade.score),
-                  }}>
-                    {grade.score}
-                  </span>
-                  <span style={styles.gradeInfo}>
-                    {grade.quarter ? `${grade.quarter} четверть · ` : ''}{grade.year}
-                  </span>
+
+            {showExamForm && (
+              <form onSubmit={handleAddExam} className="exam-form">
+                <select className="form-select" value={examForm.examType}
+                  onChange={e => setExamForm(p => ({ ...p, examType: e.target.value }))}>
+                  <option value="ЦЭ">ЦЭ</option>
+                  <option value="ЦТ">ЦТ</option>
+                  <option value="РТ">РТ</option>
+                </select>
+                <select className="form-select" value={examForm.subject}
+                  onChange={e => setExamForm(p => ({ ...p, subject: e.target.value }))}>
+                  {EXAM_SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+                <input className="form-select" type="number" min={0} max={100}
+                  value={examForm.score} placeholder="Балл (0–100)" required
+                  onChange={e => setExamForm(p => ({ ...p, score: e.target.value }))} />
+                <select className="form-select" value={examForm.year}
+                  onChange={e => setExamForm(p => ({ ...p, year: Number(e.target.value) }))}>
+                  {[CURRENT_YEAR, CURRENT_YEAR - 1].map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <button type="submit" className="btn-add">Сохранить</button>
+              </form>
+            )}
+
+            {examScores.length === 0 ? (
+              <div className="empty-state">
+                <p>Результатов пока нет.</p>
+                <p style={{ color: 'var(--text-muted)', marginTop: 4 }}>
+                  Внеси баллы ЦЭ, ЦТ или РТ — AI учтёт их при расчёте CRI.
+                </p>
+              </div>
+            ) : (
+              <div className="journal-scroll">
+                <table className="journal-table">
+                  <thead>
+                    <tr>
+                      <th className="th-subject" style={{ textAlign: 'left', paddingLeft: 16 }}>Тип</th>
+                      <th className="th-subject" style={{ textAlign: 'left' }}>Предмет</th>
+                      <th className="th-q">Балл</th>
+                      <th className="th-q">Год</th>
+                      <th className="th-del"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {examScores.map(exam => (
+                      <tr key={exam.id} className="tr-has-data">
+                        <td className="td-subject">
+                          <span className={`exam-badge ${exam.examType === 'ЦЭ' ? 'badge--ce' : exam.examType === 'РТ' ? 'badge--rt' : 'badge--ct'}`}>
+                            {exam.examType}
+                          </span>
+                        </td>
+                        <td className="td-subject">{exam.subject}</td>
+                        <td className={`td-cell ${exam.score >= 70 ? 'cell--high' : exam.score >= 50 ? 'cell--mid' : 'cell--fail'}`}>
+                          {exam.score}
+                        </td>
+                        <td className="td-subject" style={{ color: 'var(--text-muted)', fontSize: 12 }}>{exam.year}</td>
+                        <td className="td-del">
+                          <button className="del-btn" onClick={() => dispatch(deleteExamThunk(exam.id))}>×</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {popup && (
+        <div
+          ref={popupRef}
+          className="score-popup"
+          style={{ left: popup.x, top: popup.y }}
+        >
+          {popup.field === 'examScore' ? (
+            <div className="popup-exam-input">
+              <p className="popup-title">Экзаменационная оценка</p>
+              <p className="popup-sub">Изложение: через дробь (8/7)</p>
+              <input
+                className="popup-text-input"
+                value={popupValue}
+                onChange={e => setPopupValue(e.target.value)}
+                placeholder="8 или 8/7"
+                autoFocus
+              />
+              <div className="popup-actions">
+                <button className="popup-save" onClick={() => savePopup(popupValue)} disabled={saving}>
+                  {saving ? '...' : 'Сохранить'}
+                </button>
+                <button className="popup-clear" onClick={() => savePopup(null)}>Очистить</button>
+              </div>
+            </div>
+          ) : (
+            <div className="popup-scores">
+              <p className="popup-title">
+                {popup.subject} · {
+                  popup.field === 'quarter1' ? 'I четверть' :
+                  popup.field === 'quarter2' ? 'II четверть' :
+                  popup.field === 'quarter3' ? 'III четверть' :
+                  popup.field === 'quarter4' ? 'IV четверть' :
+                  popup.field === 'yearScore' ? 'Годовая' : 'Итоговая'
+                }
+              </p>
+              <div className="popup-grid">
+                {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(score => (
                   <button
-                    onClick={() => handleDelete(grade.id)}
-                    style={styles.deleteBtn}
+                    key={score}
+                    className={`popup-score-btn score-btn--${score >= 9 ? 'high' : score >= 7 ? 'mid' : score >= 5 ? 'low' : 'fail'} ${Number(popup.currentValue) === score ? 'popup-score-btn--active' : ''}`}
+                    onClick={() => savePopup(score)}
+                    disabled={saving}
+                    title={SCORE_LABELS[score]}
                   >
-                    ✕
+                    {score}
                   </button>
-                </div>
-              ))}
+                ))}
+              </div>
+              <button className="popup-clear" onClick={() => savePopup(null)}>Очистить ячейку</button>
             </div>
-          </div>
-        ))}
-      </main>
-    </div>
+          )}
+        </div>
+      )}
+    </Layout>
   );
-};
-
-const styles: Record<string, React.CSSProperties> = {
-  page: { minHeight: '100vh', background: '#f5f7fa' },
-  nav: {
-    background: '#0f3460',
-    padding: '0 32px',
-    height: '60px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  navBack: { color: '#fff', textDecoration: 'none', fontSize: '14px' },
-  navTitle: { color: '#fff', fontWeight: '700', fontSize: '18px' },
-  addBtn: {
-    background: '#e94560',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '8px',
-    padding: '8px 16px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600',
-  },
-  main: { maxWidth: '800px', margin: '0 auto', padding: '32px 20px' },
-  title: { fontSize: '28px', fontWeight: '700', color: '#1a1a2e', marginBottom: '24px' },
-  formCard: {
-    background: '#fff',
-    borderRadius: '12px',
-    padding: '24px',
-    marginBottom: '24px',
-    boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-  },
-  formTitle: { margin: '0 0 16px', color: '#1a1a2e' },
-  form: { display: 'flex', gap: '12px', flexWrap: 'wrap' },
-  input: {
-    padding: '10px 14px',
-    border: '1px solid #ddd',
-    borderRadius: '8px',
-    fontSize: '14px',
-    flex: '1',
-    minWidth: '140px',
-  },
-  submitBtn: {
-    background: '#0f3460',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '8px',
-    padding: '10px 20px',
-    cursor: 'pointer',
-    fontWeight: '600',
-  },
-  loading: { textAlign: 'center', color: '#666', padding: '40px' },
-  empty: {
-    textAlign: 'center',
-    color: '#666',
-    padding: '60px 20px',
-    background: '#fff',
-    borderRadius: '12px',
-  },
-  groupCard: {
-    background: '#fff',
-    borderRadius: '12px',
-    padding: '20px',
-    marginBottom: '16px',
-    boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-  },
-  groupHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '12px',
-  },
-  groupSubject: { margin: 0, fontSize: '16px', fontWeight: '600', color: '#1a1a2e' },
-  avgBadge: {
-    color: '#fff',
-    padding: '4px 12px',
-    borderRadius: '20px',
-    fontSize: '13px',
-    fontWeight: '600',
-  },
-  gradesList: { display: 'flex', flexDirection: 'column', gap: '8px' },
-  gradeRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '8px 0',
-    borderBottom: '1px solid #f0f0f0',
-  },
-  scoreBadge: {
-    color: '#fff',
-    width: '32px',
-    height: '32px',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontWeight: '700',
-    fontSize: '14px',
-    flexShrink: 0,
-  },
-  gradeInfo: { color: '#666', fontSize: '14px', flex: 1 },
-  deleteBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#ccc',
-    cursor: 'pointer',
-    fontSize: '16px',
-    padding: '4px',
-  },
 };
 
 export default GradesPage;

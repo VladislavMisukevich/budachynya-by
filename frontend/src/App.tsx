@@ -8,6 +8,7 @@ import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import GradesPage from './pages/GradesPage';
 import ChatbotPage from './pages/ChatbotPage';
+import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -15,9 +16,7 @@ function App() {
   const { isAuthenticated, token } = useSelector((state: RootState) => state.auth);
 
   useEffect(() => {
-    if (token && !isAuthenticated) {
-      dispatch(getMeThunk());
-    }
+    if (token && !isAuthenticated) dispatch(getMeThunk());
   }, [dispatch, token, isAuthenticated]);
 
   return (
@@ -26,21 +25,13 @@ function App() {
         <Route path="/login" element={
           isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />
         } />
-        <Route path="/register" element={
-          isAuthenticated ? <Navigate to="/dashboard" replace /> : <RegisterPage />
-        } />
-        <Route path="/dashboard" element={
-          <ProtectedRoute><DashboardPage /></ProtectedRoute>
-        } />
-        <Route path="/grades" element={
-          <ProtectedRoute><GradesPage /></ProtectedRoute>
-        } />
-        <Route path="/chatbot" element={
-          <ProtectedRoute><ChatbotPage /></ProtectedRoute>
-        } />
-        <Route path="*" element={
-          <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />
-        } />
+        {/* Register НЕ редиректит — страница сама управляет навигацией после анимации */}
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route path="/grades" element={<ProtectedRoute><GradesPage /></ProtectedRoute>} />
+        <Route path="/chatbot" element={<ProtectedRoute><ChatbotPage /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
       </Routes>
     </BrowserRouter>
   );

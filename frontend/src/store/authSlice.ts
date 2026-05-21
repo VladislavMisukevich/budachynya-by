@@ -14,7 +14,7 @@ export const registerThunk = createAsyncThunk(
   'auth/register',
   async (data: RegisterFormData, { rejectWithValue }) => {
     try {
-      const result = await authApi.register(data);
+      const result = await authApi.register(data as Parameters<typeof authApi.register>[0]);
       localStorage.setItem('token', result.token);
       return result;
     } catch (error: unknown) {
@@ -77,6 +77,7 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.token = action.payload.token;
         state.isAuthenticated = true;
+        // НЕ навигируем здесь — RegisterPage делает это сам после анимации
       })
       .addCase(registerThunk.rejected, (state, action) => {
         state.isLoading = false;

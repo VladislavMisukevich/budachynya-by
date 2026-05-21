@@ -1,21 +1,20 @@
 import { Router } from 'express';
 import { authMiddleware } from '../middlewares/auth.middleware';
 import {
-  addGrade,
-  getGrades,
-  editGrade,
-  removeGrade,
-  getSubjects,
+  upsertGradeHandler, getGrades, removeGrade, getSubjectsHandler,
+  createExamScore, getExamScores, deleteExamScore,
 } from '../controllers/grades.controller';
 
 const router = Router();
-
 router.use(authMiddleware);
 
-router.get('/subjects', getSubjects);
+router.get('/subjects', getSubjectsHandler);
 router.get('/', getGrades);
-router.post('/', addGrade);
-router.put('/:id', editGrade);
+router.post('/', upsertGradeHandler);
 router.delete('/:id', removeGrade);
+
+router.get('/exams', getExamScores);
+router.post('/exams', createExamScore);
+router.delete('/exams/:id', deleteExamScore);
 
 export default router;
