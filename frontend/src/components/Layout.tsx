@@ -10,6 +10,7 @@ interface Props { children: ReactNode; }
 const NAV_ITEMS = [
   { to: '/dashboard', icon: '⊞', label: 'Главная' },
   { to: '/grades', icon: '◫', label: 'Оценки' },
+  { to: '/tracker', icon: '◉', label: 'Трекер' },
   { to: '/chatbot', icon: '◈', label: 'AI-Навигатор' },
   { to: '/profile', icon: '◯', label: 'Профиль' },
 ];

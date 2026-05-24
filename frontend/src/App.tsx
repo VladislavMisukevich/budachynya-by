@@ -9,6 +9,7 @@ import DashboardPage from './pages/DashboardPage';
 import GradesPage from './pages/GradesPage';
 import ChatbotPage from './pages/ChatbotPage';
 import ProfilePage from './pages/ProfilePage';
+import TrackerPage from './pages/TrackerPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -22,15 +23,13 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={
-          isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />
-        } />
-        {/* Register НЕ редиректит — страница сама управляет навигацией после анимации */}
+        <Route path="/login" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
         <Route path="/grades" element={<ProtectedRoute><GradesPage /></ProtectedRoute>} />
         <Route path="/chatbot" element={<ProtectedRoute><ChatbotPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/tracker" element={<ProtectedRoute><TrackerPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
       </Routes>
     </BrowserRouter>
