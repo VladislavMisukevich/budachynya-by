@@ -111,3 +111,57 @@ model KnowledgeChunk {
 
   @@map("knowledge_chunks")
 }
+
+model Company {
+  id          String   @id @default(uuid())
+  name        String
+  industry    String
+  city        String
+  description String   @db.Text
+  website     String?
+  logoUrl     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  contracts   Contract[]
+
+  @@map("companies")
+}
+
+model Contract {
+  id              String   @id @default(uuid())
+  companyId       String
+  title           String
+  specialty       String
+  university      String
+  description     String   @db.Text
+  requirements    Json
+  benefits        Json
+  minCRI          Int      @default(50)
+  minGrade        Float    @default(7.0)
+  slotsTotal      Int      @default(5)
+  slotsTaken      Int      @default(0)
+  deadline        DateTime
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  company         Company  @relation(fields: [companyId], references: [id])
+  applications    ContractApplication[]
+
+  @@map("contracts")
+}
+
+model ContractApplication {
+  id          String   @id @default(uuid())
+  userId      String
+  contractId  String
+  status      String   @default("pending")
+  message     String?  @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  contract    Contract @relation(fields: [contractId], references: [id])
+
+  @@unique([userId, contractId])
+  @@map("contract_applications")
+}

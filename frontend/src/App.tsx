@@ -10,6 +10,7 @@ import GradesPage from './pages/GradesPage';
 import ChatbotPage from './pages/ChatbotPage';
 import ProfilePage from './pages/ProfilePage';
 import TrackerPage from './pages/TrackerPage';
+import B2BPage from './pages/B2BPage';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -30,6 +31,7 @@ function App() {
         <Route path="/chatbot" element={<ProtectedRoute><ChatbotPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
         <Route path="/tracker" element={<ProtectedRoute><TrackerPage /></ProtectedRoute>} />
+        <Route path="/b2b" element={<ProtectedRoute><B2BPage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />} />
       </Routes>
     </BrowserRouter>

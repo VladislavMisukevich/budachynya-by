@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { to: '/grades', icon: '◫', label: 'Оценки' },
   { to: '/tracker', icon: '◉', label: 'Трекер' },
   { to: '/chatbot', icon: '◈', label: 'AI-Навигатор' },
+  { to: '/b2b', icon: '◎', label: 'B2B Контракты' },
   { to: '/profile', icon: '◯', label: 'Профиль' },
 ];
 

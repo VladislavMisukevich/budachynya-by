@@ -8,7 +8,6 @@ import { aiApi } from '../api/ai.api';
 import Layout from '../components/Layout';
 import '../styles/dashboard.css';
 
-// ── Глобальная база снимков (не сбрасывается при переходах) ──
 let globalBaseline: string | null = null;
 
 const criLabel = (cri: number) => {
@@ -25,9 +24,9 @@ const makeSnapshot = (
   grades: { id: string; quarter1?: number|null; quarter2?: number|null; quarter3?: number|null; quarter4?: number|null; yearScore?: number|null; finalScore?: number|null }[],
   exams: { id: string; score: number }[]
 ) => {
-  const g = grades
-    .map(g => `${g.id}:${g.quarter1??''},${g.quarter2??''},${g.quarter3??''},${g.quarter4??''},${g.yearScore??''},${g.finalScore??''}`)
-    .sort().join('|');
+  const g = grades.map(g =>
+    `${g.id}:${g.quarter1??''},${g.quarter2??''},${g.quarter3??''},${g.quarter4??''},${g.yearScore??''},${g.finalScore??''}`
+  ).sort().join('|');
   const e = exams.map(e => `${e.id}:${e.score}`).sort().join('|');
   return `${g}::${e}`;
 };
@@ -94,34 +93,21 @@ const DashboardPage = () => {
     changed: boolean; reason: string; newCRI: number;
   } | null>(null);
 
-  const isFirstLoad = useRef(true);
-
   useEffect(() => {
     if (!user) dispatch(getMeThunk());
     dispatch(fetchGradesThunk());
     dispatch(fetchExamsThunk());
-    aiApi.loadCRI().then(({ cri }) => {
-      if (cri !== null) setCri(cri);
-    }).catch(() => {});
+    aiApi.loadCRI().then(({ cri }) => { if (cri !== null) setCri(cri); }).catch(() => {});
   }, [dispatch, user]);
 
   useEffect(() => {
-    // Ждём пока загрузятся данные
     if (grades.length === 0 && examScores.length === 0) return;
-
     const current = makeSnapshot(grades, examScores);
-
     if (globalBaseline === null) {
-      // Самый первый раз — устанавливаем базу
       globalBaseline = current;
-      isFirstLoad.current = false;
-      console.log('[CRI] Baseline set:', current.slice(0, 60));
       return;
     }
-
-    const hasChanges = current !== globalBaseline;
-    console.log('[CRI] Changed:', hasChanges, '| current:', current.slice(0,40), '| baseline:', globalBaseline.slice(0,40));
-    setCriChanged(hasChanges);
+    setCriChanged(current !== globalBaseline);
   }, [grades, examScores]);
 
   const buildDetailedData = useCallback(() => {
@@ -169,14 +155,12 @@ ${examLines}`;
     setRecalcResult(null);
     try {
       const data = buildDetailedData();
-      console.log('[CRI] Sending to recalc:\n', data);
       const result = await aiApi.recalcCRI(data);
       setCri(result.newCRI);
       setRecalcResult({ changed: result.changed, reason: result.reason, newCRI: result.newCRI });
       globalBaseline = makeSnapshot(grades, examScores);
       setCriChanged(false);
-    } catch (e) {
-      console.error('[CRI] Recalc error:', e);
+    } catch {
       setRecalcResult({ changed: false, reason: 'Ошибка соединения с AI', newCRI: cri ?? 0 });
     } finally {
       setCriLoading(false);
@@ -264,9 +248,7 @@ ${examLines}`;
                     <span className="insight-icon">↑</span>
                     <div>
                       <span className="insight-label">Сильный предмет</span>
-                      <span className="insight-value">
-                        {topSubject.subject} — {topSubject.average}
-                      </span>
+                      <span className="insight-value">{topSubject.subject} — {topSubject.average}</span>
                     </div>
                   </div>
                 )}
@@ -275,9 +257,7 @@ ${examLines}`;
                     <span className="insight-icon">↓</span>
                     <div>
                       <span className="insight-label">Подтянуть</span>
-                      <span className="insight-value">
-                        {weakSubject.subject} — {weakSubject.average}
-                      </span>
+                      <span className="insight-value">{weakSubject.subject} — {weakSubject.average}</span>
                     </div>
                   </div>
                 )}
@@ -298,6 +278,14 @@ ${examLines}`;
                 <div>
                   <div className="nav-card-title">AI-Навигатор</div>
                   <div className="nav-card-desc">Вузы · ЦЭ · ЦТ · РТ · Карьера</div>
+                </div>
+                <span className="nav-card-arrow">→</span>
+              </Link>
+              <Link to="/tracker" className="nav-card">
+                <span className="nav-card-icon">◉</span>
+                <div>
+                  <div className="nav-card-title">Карьерный трекер</div>
+                  <div className="nav-card-desc">Дорожная карта поступления</div>
                 </div>
                 <span className="nav-card-arrow">→</span>
               </Link>
@@ -326,9 +314,7 @@ ${examLines}`;
               >
                 {criLoading
                   ? '⏳ AI анализирует...'
-                  : criChanged
-                  ? '✦ Пересчитать CRI'
-                  : '✓ CRI актуален'}
+                  : criChanged ? '✦ Пересчитать CRI' : '✓ CRI актуален'}
               </button>
 
               {recalcResult && (
@@ -368,20 +354,32 @@ ${examLines}`;
             </div>
 
             <div className="panel coming-panel">
-              <div className="panel-title" style={{ marginBottom: 12 }}>Скоро</div>
-              <div className="coming-item">
+              <div className="panel-title" style={{ marginBottom: 12 }}>Разделы</div>
+
+              <Link to="/tracker" className="coming-item coming-item--active">
                 <span className="coming-icon">◉</span>
                 <div>
                   <div className="coming-title">Карьерный трекер</div>
                   <div className="coming-desc">Дорожная карта поступления</div>
                 </div>
-              </div>
-              <div className="coming-item">
+              </Link>
+
+              <div className="coming-item coming-item--soon">
                 <span className="coming-icon">◎</span>
                 <div>
                   <div className="coming-title">B2B Контракты</div>
                   <div className="coming-desc">Целевые предложения предприятий</div>
                 </div>
+                <span className="coming-badge">Скоро</span>
+              </div>
+
+              <div className="coming-item coming-item--soon">
+                <span className="coming-icon">◈</span>
+                <div>
+                  <div className="coming-title">Репетиторы</div>
+                  <div className="coming-desc">Маркетплейс по слабым предметам</div>
+                </div>
+                <span className="coming-badge">Скоро</span>
               </div>
             </div>
           </div>
